@@ -1,6 +1,6 @@
 CC = gcc
 
-LIBS = -lncurses -lcdk
+LIBS = -lncurses
 
 all:
 	$(CC) $(LIBS) -o converse converse.c
