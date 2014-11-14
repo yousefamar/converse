@@ -3,6 +3,8 @@
 #include <string.h>
 #include <ncurses.h>
 #include <signal.h>
+#include <pthread.h>
+#include <unistd.h>
 
 #define INPUT_BUFF_LEN 65536
 // TODO: Actually implement this
@@ -18,6 +20,7 @@ MsgNode *latest = NULL;
 char input[INPUT_BUFF_LEN];
 int input_len = 0;
 
+// TODO: Make threadsafe; use mutex
 MsgNode* pushMessage(char *message) {
 	MsgNode *node = (MsgNode*) malloc(sizeof(MsgNode));
 
@@ -59,6 +62,23 @@ void render() {
 	refresh();
 }
 
+void* watchFile(void* arg) {
+	char *str;
+	int i = 0;
+
+	str=(char*)arg;
+
+	while(i < 10 )
+	{
+		usleep(1000000);
+		latest = pushMessage(str);
+		++i;
+		render();
+	}
+
+	return NULL;
+}
+
 void on_winch (int sig) {
 	endwin();
 	refresh();
@@ -73,6 +93,7 @@ void on_winch (int sig) {
 int main(int argc, char *argv[]) {
 	int i, j, ch;
 	struct sigaction sa;
+	pthread_t thread;
 
 	// Init input buffer to all null chars for faster wrap checks
 	for (i = 0; i < INPUT_BUFF_LEN; ++i)
@@ -88,6 +109,8 @@ int main(int argc, char *argv[]) {
 	sigaction(SIGWINCH, &sa, NULL);
 
 	render();
+
+	pthread_create(&thread, NULL, watchFile, "processing...");
 
 	input_len = 0;
 	while ((ch = wgetch(stdscr)) != 27) {
@@ -113,7 +136,7 @@ int main(int argc, char *argv[]) {
 
 	endwin();
 
-	// TODO: Free all memory
+	// TODO: Free all memory, destroy threads, and free mutexes
 
 	return 0;
 }

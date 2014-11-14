@@ -1,6 +1,6 @@
 CC = gcc
 
-LIBS = -lncurses
+LIBS = -lncurses -lpthread
 
 all:
 	$(CC) $(LIBS) -o converse converse.c
