@@ -4,11 +4,11 @@
 #include <ncurses.h>
 #include <signal.h>
 #include <pthread.h>
-#include <unistd.h>
 
-#define INPUT_BUFF_LEN 65536
+#define LINE_BUFF_LEN 65536
 // TODO: Actually implement this
-#define LOG_LEN        1024
+#define LOG_LEN       1024
+#define NEWLINE       '\n'
 
 typedef struct _MsgNode {
 	int length;
@@ -17,7 +17,7 @@ typedef struct _MsgNode {
 } MsgNode;
 
 MsgNode *latest = NULL;
-char input[INPUT_BUFF_LEN];
+char input[LINE_BUFF_LEN];
 int input_len = 0;
 
 // TODO: Make threadsafe; use mutex
@@ -63,23 +63,44 @@ void render() {
 }
 
 void* watchFile(void* arg) {
-	char *str;
+	char *path = (char*) arg;
 	int i = 0;
+	FILE *file;
+	char c;
 
-	str=(char*)arg;
+	char line_buff[LINE_BUFF_LEN];
 
-	while(i < 10 )
-	{
-		usleep(1000000);
-		latest = pushMessage(str);
-		++i;
-		render();
+	file = fopen(path, "r");
+
+	if (file == NULL) {
+		fprintf(stderr, "Could not read input from %s.\n", path);
+		exit(1);
 	}
+
+	while ((c = fgetc(file)) != EOF) {
+		if (c == NEWLINE) {
+			line_buff[i] = '\0';
+			latest = pushMessage(line_buff);
+			render();
+			i = 0;
+			continue;
+		}
+
+		if (i < (LINE_BUFF_LEN - 1))
+			line_buff[i] = c;
+
+		if (i == (LINE_BUFF_LEN - 1))
+			fprintf(stderr, "Warning: Line buffer overflow; message truncated.\n");
+
+		++i;
+	}
+
+	fclose(file);
 
 	return NULL;
 }
 
-void on_winch (int sig) {
+void onWinch (int sig) {
 	endwin();
 	refresh();
 
@@ -96,7 +117,7 @@ int main(int argc, char *argv[]) {
 	pthread_t thread;
 
 	// Init input buffer to all null chars for faster wrap checks
-	for (i = 0; i < INPUT_BUFF_LEN; ++i)
+	for (i = 0; i < LINE_BUFF_LEN; ++i)
 		input[i] = '\0';
 
 	initscr();
@@ -105,18 +126,21 @@ int main(int argc, char *argv[]) {
 	keypad(stdscr, TRUE);
 
 	memset(&sa, 0, sizeof(struct sigaction));
-	sa.sa_handler = on_winch;
+	sa.sa_handler = onWinch;
 	sigaction(SIGWINCH, &sa, NULL);
 
 	render();
 
-	pthread_create(&thread, NULL, watchFile, "processing...");
+	pthread_create(&thread, NULL, watchFile, "test");
 
 	input_len = 0;
 	while ((ch = wgetch(stdscr)) != 27) {
 		if (ch > 31 && ch < 127) {
-			input[input_len] = ch;
-			input_len++;
+			if (input_len < (LINE_BUFF_LEN - 1)) {
+				input[input_len++] = ch;
+			} else {
+				fprintf(stderr, "Warning: Input buffer overflow; message truncated.\n");
+			}
 		} else {
 			switch (ch) {
 				case KEY_ENTER:
