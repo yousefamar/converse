@@ -4,6 +4,7 @@
 #include <ncurses.h>
 #include <signal.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #define LINE_BUFF_LEN 65536
 // TODO: Actually implement this
@@ -73,11 +74,20 @@ void* watchFile(void* arg) {
 	file = fopen(path, "r");
 
 	if (file == NULL) {
+		endwin();
 		fprintf(stderr, "Could not read input from %s.\n", path);
 		exit(1);
 	}
 
-	while ((c = fgetc(file)) != EOF) {
+	while (1) {
+		c = fgetc(file);
+
+		if(c == EOF) {
+			// TODO: Perhaps count the number of EOFs and scale sleep time relatively.
+			usleep(100000);
+			continue;
+		}
+
 		if (c == NEWLINE) {
 			line_buff[i] = '\0';
 			latest = pushMessage(line_buff);
@@ -131,7 +141,7 @@ int main(int argc, char *argv[]) {
 
 	render();
 
-	pthread_create(&thread, NULL, watchFile, "test");
+	pthread_create(&thread, NULL, watchFile, "converse-in");
 
 	input_len = 0;
 	while ((ch = wgetch(stdscr)) != 27) {
