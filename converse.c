@@ -75,7 +75,7 @@ void* watchFile(void* arg) {
 
 	if (file == NULL) {
 		endwin();
-		fprintf(stderr, "Could not read input from %s.\n", path);
+		fprintf(stderr, "Could not open input file \"%s\" for reading.\n", path);
 		exit(1);
 	}
 
@@ -126,6 +126,16 @@ int main(int argc, char *argv[]) {
 	struct sigaction sa;
 	pthread_t thread;
 
+	FILE *file_out;
+	char path_out[] = "converse-out";
+
+	file_out = fopen(path_out, "a");
+
+	if (file_out == NULL) {
+		fprintf(stderr, "Could not open output file \"%s\" for appending.\n", path_out);
+		exit(1);
+	}
+
 	// Init input buffer to all null chars for faster wrap checks
 	for (i = 0; i < LINE_BUFF_LEN; ++i)
 		input[i] = '\0';
@@ -156,6 +166,8 @@ int main(int argc, char *argv[]) {
 				case KEY_ENTER:
 				case '\n':
 				case '\r':
+					fprintf(file_out, "%s\n", input);
+					fflush(file_out);
 					latest = pushMessage(input);
 					for (j = 0; j < input_len; j++)
 						input[j] = '\0';
@@ -170,6 +182,7 @@ int main(int argc, char *argv[]) {
 
 	endwin();
 
+	fclose(file_out);
 	// TODO: Free all memory, destroy threads, and free mutexes
 
 	return 0;
