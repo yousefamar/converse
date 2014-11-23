@@ -34,4 +34,12 @@ It would be great if that were possible but it's not, since `stdout` is used to 
 
 That's entirely possible and should be done outside of converse. Use I/O redirection, named pipes, and commands like `tee`. You could even write your own middleman scripts that intelligently modify and reroute I/O. The freedom of choice is yours!
 
+
+Coming Soon
+-----------
+
+  - Scroll support
+  - External editor input support
+  - Option to compile with window alert on message support
+
 <!-- vim: set wrap linebreak spell : -->
