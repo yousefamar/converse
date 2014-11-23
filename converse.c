@@ -125,15 +125,18 @@ int main(int argc, char *argv[]) {
 	int i, j, ch;
 	struct sigaction sa;
 	pthread_t thread;
-
 	FILE *file_out;
-	char path_out[] = "converse-out";
 
-	file_out = fopen(path_out, "a");
+	if (argc != 3) {
+		printf("usage: %s input_file output_file\n", argv[0]);
+		return 0;
+	}
+
+	file_out = fopen(argv[2], "a");
 
 	if (file_out == NULL) {
-		fprintf(stderr, "Could not open output file \"%s\" for appending.\n", path_out);
-		exit(1);
+		fprintf(stderr, "Could not open output file \"%s\" for appending.\n", argv[2]);
+		return 1;
 	}
 
 	// Init input buffer to all null chars for faster wrap checks
@@ -151,7 +154,7 @@ int main(int argc, char *argv[]) {
 
 	render();
 
-	pthread_create(&thread, NULL, watchFile, "converse-in");
+	pthread_create(&thread, NULL, watchFile, argv[1]);
 
 	input_len = 0;
 	while ((ch = wgetch(stdscr)) != 27) {
