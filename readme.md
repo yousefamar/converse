@@ -9,4 +9,6 @@ Converse was written to play nice with apps that adhere to the Unix philosophy l
 
 With the magic of scripting and converse, you could for example log and reply to tweets, or chat with Cleverbot, or *converse* with anything that will let you, through a single interface!
 
-Converse is a tiny, single-file program written in C. It has two dependencies: ncurses (for a text-based UI in your terminal) and pthread (for multithreading). Both are already installed most places. To compile, all you need to do is run `make`. To customize anything, just modify the code directly and recompile. It's super simple for a reason!
+Converse is a tiny, single-file program written in ANSI C. It has two dependencies: ncurses (for a text-based UI in your terminal) and pthread (for multithreading). Both are already installed most places. To compile, all you need to do is run `make`. To customize anything, just modify the code directly and recompile. It's super simple for a reason!
+
+<!-- vim: set wrap linebreak spell : -->
