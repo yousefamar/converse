@@ -166,6 +166,11 @@ int main(int argc, char *argv[]) {
 			}
 		} else {
 			switch (ch) {
+				case KEY_BACKSPACE:
+				case 127:
+					if (input_len > 0)
+						input[--input_len] = '\0';
+					break;
 				case KEY_ENTER:
 				case '\n':
 				case '\r':
