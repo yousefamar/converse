@@ -22,6 +22,10 @@ Converse is a tiny, single-file program written in ANSI C. It has two dependenci
 
 Both are already installed most places. To compile, all you need to do is run `make` in the same directory.
 
+**How do I install?**
+
+You guessed it: `sudo make install` after `make`.
+
 **How do I customize the UI?**
 
 To customize anything, just modify the code directly and recompile. It's super simple and thoroughly documented for a reason!
