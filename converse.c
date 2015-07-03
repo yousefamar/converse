@@ -31,6 +31,8 @@ int log_counter = 0;
 /** The user input buffer */
 char input[LINE_BUFF_LEN];
 int input_len = 0;
+/** A mutex to make rendering thread-safe */
+pthread_mutex_t render_mutex;
 
 /**
  * Adds a message to the bottom of the message log.
@@ -73,6 +75,8 @@ void render() {
 	int i, id, col, line, lines;
 	MsgNode *current = newest;
 
+	pthread_mutex_lock(&render_mutex);
+
 	clear();
 
 	/* Render message log from newest to top of window with rudimentary soft wrapping */
@@ -101,6 +105,8 @@ void render() {
 
 	/* ncurses redraw */
 	refresh();
+
+	pthread_mutex_unlock(&render_mutex);
 }
 
 /**
