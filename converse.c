@@ -9,21 +9,25 @@
 /** The maximum length (in characters) of any message */
 #define LINE_BUFF_LEN 65536
 /** How many logged messages are stored in memory */
-// TODO: Actually implement this
 #define LOG_LEN       1024
 #define NEWLINE       '\n'
 
 /**
- * A stack that stores logged messages.
+ * A doubly linked list that stores logged messages.
  */
 typedef struct _MsgNode {
 	int length;
 	char *message;
 	struct _MsgNode *previous;
+	struct _MsgNode *next;
 } MsgNode;
 
-/** The top node on the stack (latest logged message) */
-MsgNode *latest = NULL;
+/** The last node in the list (newest logged message) */
+MsgNode *newest = NULL;
+/** The first node in the list (oldest logged message) */
+MsgNode *oldest = NULL;
+/** The number of messages currently in the log */
+int log_counter = 0;
 /** The user input buffer */
 char input[LINE_BUFF_LEN];
 int input_len = 0;
@@ -32,19 +36,34 @@ int input_len = 0;
  * Adds a message to the bottom of the message log.
  *
  * @param message The message to be logged.
- *
- * @return node The message node containing the latest logged message.
  */
-// TODO: Make threadsafe; use mutex
-MsgNode* pushMessage(char *message) {
+void pushMessage(char *message) {
+	/* Create new message node */
 	MsgNode *node = (MsgNode*) malloc(sizeof(MsgNode));
 
-	node->length = strlen(message);
-	node->message = (char*) malloc(node->length * (sizeof(char)));
+	node->length   = strlen(message);
+	node->message  = (char*) malloc((node->length + 1) * (sizeof(char)));
 	strcpy(node->message, message);
-	node->previous = latest;
+	node->previous = newest;
+	node->next     = NULL;
 
-	return node;
+	/* Update references to newest and oldest */
+	if (newest != NULL)
+		newest->next = node;
+	newest = node;
+	if (oldest == NULL)
+		oldest = node;
+
+	/* Delete oldest message nodes while there are more than LOG_LEN logged nodes */
+	for (++log_counter; log_counter > LOG_LEN; --log_counter) {
+		node = oldest->next;
+		node->previous   = NULL;
+		free(oldest->message);
+		oldest->previous = NULL;
+		oldest->next     = NULL;
+		free(oldest);
+		oldest = node;
+	}
 }
 
 /**
@@ -52,22 +71,20 @@ MsgNode* pushMessage(char *message) {
  */
 void render() {
 	int i, id, col, line, lines;
-	MsgNode *current = latest;
+	MsgNode *current = newest;
 
 	clear();
 
-	/* Render message log from latest to top of window with rudimentary soft wrapping */
-	if (latest != NULL) {
-		for (i = 0; i < LINES - 2 && current != NULL; current = current->previous) {
-			// TODO: Implement word soft wrapping
-			lines = current->length / COLS + 1;
-			i += lines;
-			id = 0;
-			for (line = 0; line < lines; ++line)
-				for (col = 0; id < current->length && col < COLS; ++col, ++id)
-					if (LINES - 2 - i + line >= 0)
-						mvaddch(LINES - 2 - i + line, col, current->message[id]);
-		}
+	/* Render message log from newest to top of window with rudimentary soft wrapping */
+	for (i = 0; i < LINES - 2 && current != NULL; current = current->previous) {
+		// TODO: Implement word soft wrapping
+		lines = current->length / COLS + 1;
+		i += lines;
+		id = 0;
+		for (line = 0; line < lines; ++line)
+			for (col = 0; id < current->length && col < COLS; ++col, ++id)
+				if (LINES - 2 - i + line >= 0)
+					mvaddch(LINES - 2 - i + line, col, current->message[id]);
 	}
 
 	/* Render horizontal rule above user input area */
@@ -125,7 +142,7 @@ void* watchFile(void* arg) {
 		/* If a newline character is reached, log the line and reset the line buffer */
 		if (c == NEWLINE) {
 			line_buff[i] = '\0';
-			latest = pushMessage(line_buff);
+			pushMessage(line_buff);
 			render();
 			i = 0;
 			continue;
