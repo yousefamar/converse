@@ -224,14 +224,13 @@ int main(int argc, char *argv[]) {
 					if (input_len > 0)
 						input[--input_len] = '\0';
 					break;
-				/* Send message to output_file, push message to log,
+				/* Send message to output_file,
 				 * and clear input buffer on Enter */
 				case KEY_ENTER:
 				case '\n':
 				case '\r':
 					fprintf(file_out, "%s\n", input);
 					fflush(file_out);
-					latest = pushMessage(input);
 					for (j = 0; j < input_len; j++)
 						input[j] = '\0';
 					input_len = 0;
