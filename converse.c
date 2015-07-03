@@ -71,8 +71,9 @@ void render() {
 	}
 
 	/* Render horizontal rule above user input area */
-	for (i = 0; i < COLS; i++)
-		mvaddch(LINES - 2, i, '_');
+	move(LINES - 2, 0);
+	hline(0, COLS);
+	move(LINES - 1, 0);
 
 	/* Render input buffer making sure the rightmost characters are always visible
 	 * (if the text is longer than the terminal window allows) */
