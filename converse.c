@@ -113,7 +113,7 @@ void* watchFile(void* arg) {
 	char *path = (char*) arg;
 	int i = 0;
 	FILE *file;
-	char c;
+	char c, c_prev;
 
 	char line_buff[LINE_BUFF_LEN];
 
@@ -133,8 +133,11 @@ void* watchFile(void* arg) {
 
 		/* If the end of the file is reached, reduce character polling frequency */
 		if(c == EOF) {
-			// TODO: Perhaps count the number of EOFs and scale sleep time relatively.
+			/* Render only on change to EOF to load large files quicker on start */
+			if (c_prev != EOF)
+				render();
 			/* Pause thread for 100ms */
+			// TODO: Perhaps count the number of EOFs and scale sleep time relatively.
 			usleep(100000);
 			continue;
 		}
@@ -143,7 +146,6 @@ void* watchFile(void* arg) {
 		if (c == NEWLINE) {
 			line_buff[i] = '\0';
 			pushMessage(line_buff);
-			render();
 			i = 0;
 			continue;
 		}
@@ -155,6 +157,7 @@ void* watchFile(void* arg) {
 		if (i == (LINE_BUFF_LEN - 1))
 			fprintf(stderr, "Warning: Line buffer overflow; message truncated.\n");
 
+		c_prev = c;
 		++i;
 	}
 
