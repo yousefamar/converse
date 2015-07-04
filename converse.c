@@ -142,6 +142,7 @@ void* watchFile(void* arg) {
 			/* Render only on change to EOF to load large files quicker on start */
 			if (c_prev != EOF)
 				render();
+			c_prev = c;
 			/* Pause thread for 100ms */
 			// TODO: Perhaps count the number of EOFs and scale sleep time relatively.
 			usleep(100000);
@@ -153,6 +154,7 @@ void* watchFile(void* arg) {
 			line_buff[i] = '\0';
 			pushMessage(line_buff);
 			i = 0;
+			c_prev = c;
 			continue;
 		}
 
