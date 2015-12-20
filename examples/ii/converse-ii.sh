@@ -32,4 +32,4 @@ trap 'kill $(jobs -pr)' SIGINT SIGTERM EXIT
 tail -n +1 -f "$1/out" | clean > "$1/out-clean" &
 
 # Launch converse
-$TERMINAL -title "converse - $1" -e converse "$1/out-clean" "$1/in"
+$TERMINAL -title "$(basename $1) - converse - $1" -e converse "$1/out-clean" "$1/in"
