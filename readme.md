@@ -15,7 +15,7 @@ FAQ
 
 **How do I compile?**
 
-Converse is a tiny, single-file program written in ANSI C. It has two dependencies:
+Converse is a tiny, single-file program written in C. It has two dependencies:
 
   - *ncurses*; for a text-based UI in your terminal
   - *pthread*; for multithreading
