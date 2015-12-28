@@ -30,7 +30,15 @@ MsgNode *oldest = NULL;
 int log_counter = 0;
 /** The user input buffer */
 char input[LINE_BUFF_LEN];
-int input_len = 0;
+int input_len  = 0;
+/** The user input text cursor position */
+int cursor_pos = 0;
+/**
+ * A character offset from which the input buffer is rendered
+ * to make sure the cursor is always visible if the text is
+ * longer than the terminal window allows
+ */
+int input_offset = 0;
 /** A mutex to make rendering thread-safe */
 pthread_mutex_t render_mutex;
 
@@ -96,12 +104,16 @@ void render() {
 	hline(0, COLS);
 	move(LINES - 1, 0);
 
-	/* Render input buffer making sure the rightmost characters are always visible
-	 * (if the text is longer than the terminal window allows) */
-	id = input_len - COLS;
-	if (id < 0) id = 0;
-	for (i = 0; i < input_len && i < COLS; ++i)
-		mvaddch(LINES - 1, i, input[id++]);
+	/* Make sure the cursor is always visible */
+	if (cursor_pos < input_offset)            input_offset = cursor_pos;
+	if (cursor_pos > input_offset + COLS - 1) input_offset = cursor_pos - COLS + 1;
+
+	/* Render input buffer
+	 * NB: Cannot write to bottom-right corner due to various limitations */
+	mvaddnstr(LINES - 1, 0, input + input_offset, COLS - 1);
+
+	/* Move ncurses cursor to correct position */
+	move(LINES - 1, cursor_pos - input_offset);
 
 	/* ncurses redraw */
 	refresh();
@@ -235,23 +247,34 @@ int main(int argc, char *argv[]) {
 	pthread_create(&thread, NULL, watchFile, argv[1]);
 
 	/* Read and handle user keyboard input */
-	input_len = 0;
+	input_len  = 0;
+	cursor_pos = 0;
 	/* Quit on Esc */
 	while ((ch = wgetch(stdscr)) != 27) {
-		/* Add alphanumeric characters to input buffer */
+		/* Add alphanumeric characters to input buffer at cursor position */
 		if (ch > 31 && ch < 127) {
 			if (input_len < (LINE_BUFF_LEN - 1)) {
-				input[input_len++] = ch;
+				/* Shift all characters after the cursor forward */
+				for (i = input_len; i > cursor_pos; --i)
+					input[i] = input[i - 1];
+				/* Set typed character */
+				input[cursor_pos++] = ch;
+				++input_len;
 			} else {
 				fprintf(stderr, "Warning: Input buffer overflow; message truncated.\n");
 			}
 		} else {
 			switch (ch) {
-				/* Delete last character in input buffer on backspace */
+				/* Delete character before cursor in input buffer on backspace */
 				case KEY_BACKSPACE:
 				case 127:
-					if (input_len > 0)
-						input[--input_len] = '\0';
+					if (cursor_pos < 1)
+						break;
+					/* Shift all characters after the cursor back */
+					for (i = --cursor_pos; i < input_len; ++i)
+						input[i] = input[i + 1];
+					/* Delete last character */
+					input[--input_len] = '\0';
 					break;
 				/* Send message to output_file,
 				 * and clear input buffer on Enter */
@@ -263,6 +286,17 @@ int main(int argc, char *argv[]) {
 					for (j = 0; j < input_len; j++)
 						input[j] = '\0';
 					input_len = 0;
+					cursor_pos = 0;
+					break;
+				/* Move cursor left on pressing left */
+				case KEY_LEFT:
+					if (cursor_pos > 0)
+						--cursor_pos;
+					break;
+				/* Move cursor right on pressing right */
+				case KEY_RIGHT:
+					if (cursor_pos < input_len)
+						++cursor_pos;
 					break;
 				default:
 					break;
