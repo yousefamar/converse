@@ -6,11 +6,37 @@
 #include <pthread.h>
 #include <unistd.h>
 
-/** The maximum length (in characters) of any message */
+/**
+ * The maximum length (in characters) of any message
+ * NB: Does not includes ANSI escape sequences
+ */
 #define LINE_BUFF_LEN 65536
 /** How many logged messages are stored in memory */
 #define LOG_LEN       1024
 #define NEWLINE       '\n'
+#define ESC_CHAR      '\e'
+
+/** A map of ANSI escape codes to ncurses attributes */
+int attr_map[] = {
+	0,
+	A_BOLD,
+	A_DIM,
+	0,
+	A_UNDERLINE,
+	A_BLINK,
+	0,
+	A_REVERSE,
+	A_INVIS
+};
+
+/**
+ * A linked list of format states.
+ */
+typedef struct _FormatState {
+	int index;
+	int code;
+	struct _FormatState *next;
+} FormatState;
 
 /**
  * A doubly linked list that stores logged messages.
@@ -18,6 +44,7 @@
 typedef struct _MsgNode {
 	int length;
 	char *message;
+	FormatState *format_states;
 	struct _MsgNode *previous;
 	struct _MsgNode *next;
 } MsgNode;
@@ -47,13 +74,15 @@ pthread_mutex_t render_mutex;
  *
  * @param message The message to be logged.
  */
-void pushMessage(char *message) {
+void pushMessage(char *message, FormatState *format_states) {
 	/* Create new message node */
 	MsgNode *node = (MsgNode*) malloc(sizeof(MsgNode));
+	FormatState *format_state = NULL, *format_state_next = NULL;
 
 	node->length   = strlen(message);
 	node->message  = (char*) malloc((node->length + 1) * (sizeof(char)));
 	strcpy(node->message, message);
+	node->format_states = format_states;
 	node->previous = newest;
 	node->next     = NULL;
 
@@ -67,10 +96,13 @@ void pushMessage(char *message) {
 	/* Delete oldest message nodes while there are more than LOG_LEN logged nodes */
 	for (++log_counter; log_counter > LOG_LEN; --log_counter) {
 		node = oldest->next;
-		node->previous   = NULL;
+		node->previous = NULL;
 		free(oldest->message);
-		oldest->previous = NULL;
-		oldest->next     = NULL;
+		/* Delete format states */
+		for (format_state = oldest->format_states; format_state != NULL; format_state = format_state_next) {
+			format_state_next = format_state->next;
+			free(format_state);
+		}
 		free(oldest);
 		oldest = node;
 	}
@@ -81,7 +113,9 @@ void pushMessage(char *message) {
  */
 void render() {
 	int i, id, col, line, lines;
+	int curr_color_fg, curr_color_bg;
 	MsgNode *current = newest;
+	FormatState *format_state = NULL;
 
 	pthread_mutex_lock(&render_mutex);
 
@@ -89,15 +123,74 @@ void render() {
 
 	/* Render message log from newest to top of window with rudimentary soft wrapping */
 	for (i = 0; i < LINES - 2 && current != NULL; current = current->previous) {
+		format_state = current->format_states;
+		/* Reset colors */
+		curr_color_fg = -1;
+		curr_color_bg = -1;
+		/* Reset attributes */
+		attroff(A_ATTRIBUTES);
 		// TODO: Implement word soft wrapping
 		lines = current->length / COLS + 1;
 		i += lines;
 		id = 0;
-		for (line = 0; line < lines; ++line)
-			for (col = 0; id < current->length && col < COLS; ++col, ++id)
-				if (LINES - 2 - i + line >= 0)
+		for (line = 0; line < lines; ++line) {
+			for (col = 0; id < current->length && col < COLS; ++col, ++id) {
+				if (LINES - 2 - i + line >= 0) {
+
+					/* Apply any new formatting up to current char id */
+					while (format_state != NULL && id == format_state->index) {
+						if (format_state->code < 1) {
+							/* Reset attributes */
+							attroff(A_ATTRIBUTES);
+						} else if (format_state->code < 9) {
+							/* Set attribute */
+							attron(attr_map[format_state->code]);
+						} else if (format_state->code > 20 && format_state->code < 29) {
+							/* Reset attribute */
+							attroff(attr_map[format_state->code - 20]);
+
+						/* Foreground colors */
+						} else if (format_state->code == 39) {
+							/* Reset FG color */
+							curr_color_fg = -1;
+							attron(COLOR_PAIR((curr_color_fg + 1) + 9 * (curr_color_bg + 1) + 1));
+						} else if (format_state->code > 29 && format_state->code < 37) {
+							/* Set FG color */
+							curr_color_fg = format_state->code - 30;
+							attron(COLOR_PAIR((curr_color_fg + 1) + 9 * (curr_color_bg + 1) + 1));
+						} else if (format_state->code == 97) {
+							/* Set FG white */
+							curr_color_fg = format_state->code - 90;
+							attron(COLOR_PAIR((curr_color_fg + 1) + 9 * (curr_color_bg + 1) + 1));
+
+						/* Background colors */
+						} else if (format_state->code == 49) {
+							/* Reset BG color */
+							curr_color_bg = -1;
+							attron(COLOR_PAIR((curr_color_fg + 1) + 9 * (curr_color_bg + 1) + 1));
+						} else if (format_state->code > 39 && format_state->code < 47) {
+							/* Set BG color */
+							curr_color_bg = format_state->code - 40;
+							attron(COLOR_PAIR((curr_color_fg + 1) + 9 * (curr_color_bg + 1) + 1));
+						} else if (format_state->code == 107) {
+							/* Set BG white */
+							curr_color_bg = format_state->code - 100;
+							attron(COLOR_PAIR((curr_color_fg + 1) + 9 * (curr_color_bg + 1) + 1));
+
+						} else {
+							/* Silently ignore unknown escape codes */
+						}
+						format_state = format_state->next;
+					}
+					/* Render formatted character */
 					mvaddch(LINES - 2 - i + line, col, current->message[id]);
+				}
+			}
+		}
 	}
+
+	/* Reset attributes */
+	attroff(A_ATTRIBUTES);
 
 	/* Render horizontal rule above user input area */
 	move(LINES - 2, 0);
@@ -132,6 +225,12 @@ void* watchFile(void* arg) {
 	int i = 0;
 	FILE *file;
 	char c, c_prev;
+	char esc_buf[4];
+	int esc_code, esc_count;
+	int esc_flag  = FALSE;
+	FormatState *format_state      = NULL;
+	FormatState *format_state_head = NULL;
+	FormatState *format_state_tail = NULL;
 
 	char line_buff[LINE_BUFF_LEN];
 
@@ -156,17 +255,74 @@ void* watchFile(void* arg) {
 				render();
 			c_prev = c;
 			/* Pause thread for 100ms */
-			// TODO: Perhaps count the number of EOFs and scale sleep time relatively.
+			// TODO: Perhaps count the number of EOFs and scale sleep time relatively
 			usleep(100000);
 			continue;
 		}
 
-		/* If a newline character is reached, log the line and reset the line buffer */
+		/* If a newline character is reached, log the line
+		 * and reset the line buffer and format state pointers */
 		if (c == NEWLINE) {
 			line_buff[i] = '\0';
-			pushMessage(line_buff);
+			pushMessage(line_buff, format_state_head);
 			i = 0;
 			c_prev = c;
+			format_state_head = NULL;
+			format_state_tail = NULL;
+			continue;
+		}
+
+		/* Enter ANSI escape code mode */
+		if (c == ESC_CHAR) {
+			esc_count = 0;
+			esc_flag = TRUE;
+			continue;
+		}
+
+		/* If in ANSI escape code mode, parse ANSI escape codes */
+		if (esc_flag) {
+			// FIXME: Make left square bracket not optional
+			if (c == '[')
+				continue;
+			/* If the end of an escape code is reached, add it to the format states list */
+			if (c == 'm' || c == ';') {
+				esc_buf[esc_count] = '\0';
+				esc_code = atoi(esc_buf);
+
+				/* Create new format state */
+				format_state = (FormatState*) malloc(sizeof(FormatState));
+				format_state->index = i;
+				format_state->code  = esc_code;
+				format_state->next  = NULL;
+
+				/* Add to format states list for current message */
+				if (format_state_head == NULL) {
+					format_state_head = format_state;
+				} else {
+					format_state_tail->next = format_state;
+				}
+				format_state_tail = format_state;
+
+				/* Leave ANSI escape code mode if end of sequence reached */
+				if (c == 'm') {
+					esc_flag = FALSE;
+					continue;
+				}
+				esc_count = 0;
+				continue;
+			}
+			/* Abort on malformed control sequence (invalid char) */
+			if (c < '0' || c > '9') {
+				esc_flag = FALSE;
+				continue;
+			}
+			/* Add escape code digit to escape code buffer */
+			esc_buf[esc_count++] = c;
+			/* Abort on malformed control sequence (too long) */
+			if (esc_count > 3) {
+				esc_flag = FALSE;
+				continue;
+			}
 			continue;
 		}
 
@@ -235,6 +391,16 @@ int main(int argc, char *argv[]) {
 	noecho();
 	raw();
 	keypad(stdscr, TRUE);
+
+	/* Init color pairs
+	 * Pair IDs are 1-indexed
+	 * Color IDs are in the range [-1, 7] where -1 is the terminal default
+	 * There are a total of 81 pairs, indexed by ((fg_id + 1) + 9 * (bg_id + 1) + 1) */
+	start_color();
+	use_default_colors();
+	for (i = -1; i < 8; ++i)
+		for (j = -1; j < 8; ++j)
+			init_pair((i + 1) + 9 * (j + 1) + 1, i, j);
 
 	/* Register window resize callback */
 	memset(&sa, 0, sizeof(struct sigaction));

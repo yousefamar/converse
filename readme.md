@@ -28,7 +28,11 @@ You guessed it: `sudo make install` after `make`.
 
 **How do I customize the UI?**
 
-To customize anything, just modify the code directly and recompile. It's super simple and thoroughly documented for a reason!
+Although converse uses ncurses, there is special support for some ANSI escape codes. These include foreground and background set and reset for the eight main terminal colours (black, red, green, yellow, blue, magenta, cyan, and white) and common formatting (bold, dim, underline, blink, reverse, and hidden) as long as your terminal supports them. Terminal defaults are used if something isn't set. Try something like this to check if things work for you:
+
+    echo -e "default \e[30mblack \e[31mred \e[32mgreen \e[33myellow \e[34mblue \e[35mmagenta \e[36mcyan \e[97mwhite\e[39m \e[40mblack \e[41mred \e[42mgreen \e[43myellow \e[44mblue \e[45mmagenta \e[46mcyan \e[30;107mwhite\e[39;49m \e[1mbold\e[21m \e[2mdim\e[22m \e[4munderlined\e[24m \e[5mblink\e[25m \e[7mreverse\e[27m \e[8mhidden\e[28m \e[34;1;4;7mhybrid\e[0m default\e[36m" > converse-in
+
+To customize anything else, just modify the code directly and recompile. It's super simple and thoroughly documented for a reason!
 
 **Why not use stdin and stdout for something like `input-file | converse | output-file`?**
 
