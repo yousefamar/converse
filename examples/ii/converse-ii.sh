@@ -19,9 +19,11 @@ clean () {
 		date=$(echo "$line" | cut -d' ' -f1)
 		if [ "$date" != "$last_date" ]; then
 			last_date="$date"
-			echo "$date"
+			echo -e "\e[35m$date\e[39m"
 		fi
-		echo "$line" | cut -d' ' -f2-
+		echo -en "\e[34m$(echo "$line" | cut -d' ' -f2)\e[39m "
+		echo -en "\e[32m$(echo "$line" | cut -d' ' -f3)\e[39m "
+		echo "$line" | cut -d' ' -f4-
 	done
 }
 
