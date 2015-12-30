@@ -21,10 +21,13 @@ fi
 
 while true; do
 	# This part is based on uii/iiinotify
-	notification=$(inotifywait -q -r "$1" -e modify)
-	file=$(echo "$notification" | cut -f3 -d ' ')
+	notification=$(inotifywait -q -r "$1" -e create,modify)
 	directory=$(echo "$notification" | cut -f1 -d ' ')
+	event=$(echo "$notification" | cut -f2 -d ' ')
+	file=$(echo "$notification" | cut -f3 -d ' ')
+	[ "$event" = "CREATE,ISDIR" ] && notify-send -u critical -- "Channel Joined" "$directory$file"
 	if [ "$file" = "out" ]; then
+		# TODO: Add special case for differentiating networks on IRC bouncers
 		server=$(echo "$directory" | awk -F/ '{print $(NF-2)}')
 		channel=$(echo "$directory" | awk -F/ '{print $(NF-1)}')
 		line=$(tail -n1 "$directory/$file") #| sed -e 's/&/\&amp;/g' | sed -e 's/</\&lt;/g')
